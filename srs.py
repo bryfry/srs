@@ -3,6 +3,22 @@ from utils import find_free_port
 from flag import random_flag_bit
 from aiohttp import web
 
+closers = []
+runners = []
+
+async def homepage_handler(request):
+    return web.HTTPFound('/index.html')
+
+async def homepage(port=8001):
+    app = web.Application()
+    app.router.add_route('*', '/', homepage_handler)
+    app.router.add_static(prefix="/", path="/var/www/html/srs/")
+    runner= web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    print(f"{site.name} starting")
+    await site.start()
+    runners.append(runner)
 
 class ClosingHandler:
     def __init__(self, exit_event):
@@ -20,8 +36,6 @@ class ClosingHandler:
             "flag-slice": random_flag_slice(),
         }
         return web.json_response(data)
-
-closers = []
 
 # single request server
 async def srs(port=None):
@@ -60,6 +74,8 @@ async def srs(port=None):
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
 
+    loop.create_task(homepage())
+
     for i in range(100):
         loop.create_task(srs())
 
@@ -69,4 +85,6 @@ if __name__ == "__main__":
         print("\nexiting...")
     finally:
         for c in closers:
-            c.set()  # useful event to also call runner.cleanup
+            c.set()  # useful event to also call await runner.cleanup()
+        for r in runners:
+            loop.create_task(r.cleanup())
