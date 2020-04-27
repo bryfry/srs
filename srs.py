@@ -7,20 +7,23 @@ from aiohttp import web
 closers = []
 runners = []
 
+
 async def homepage_handler(request):
-    return web.HTTPFound('/index.html')
+    return web.HTTPFound("/index.html")
+
 
 async def homepage(port=8001):
     app = web.Application()
-    app.router.add_route('*', '/', homepage_handler)
+    app.router.add_route("*", "/", homepage_handler)
     app.router.add_static(prefix="/", path="/var/www/html/srs/")
-    runner= web.AppRunner(app)
+    runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "127.0.0.1", port)
     logging.info(f"{site.name} starting")
     await site.start()
     runners.append(runner)
     return
+
 
 class ClosingHandler:
     def __init__(self, exit_event):
@@ -38,6 +41,7 @@ class ClosingHandler:
             "flag-slice": random_flag_index(),
         }
         return web.json_response(data)
+
 
 # single request server
 async def srs(port=None):
@@ -62,7 +66,9 @@ async def srs(port=None):
     try:
         await site.start()
     except OSError:
-        logging.warn(f"port {port} already in use, trying a different one")
+        logging.warn(
+            f"port {port} already in use, trying a different one"
+        )
         await srs()
 
     # wait for closing event
