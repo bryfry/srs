@@ -1,6 +1,7 @@
 import asyncio
+import logging
 from utils import find_free_port
-from flag import random_flag_bit
+from flag import random_flag_index
 from aiohttp import web
 
 closers = []
@@ -15,10 +16,11 @@ async def homepage(port=8001):
     app.router.add_static(prefix="/", path="/var/www/html/srs/")
     runner= web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    print(f"{site.name} starting")
+    site = web.TCPSite(runner, "127.0.0.1", port)
+    logging.info(f"{site.name} starting")
     await site.start()
     runners.append(runner)
+    return
 
 class ClosingHandler:
     def __init__(self, exit_event):
@@ -33,7 +35,7 @@ class ClosingHandler:
         data = {
             "now": request.url.port,
             "next": self.next_port,
-            "flag-slice": random_flag_slice(),
+            "flag-slice": random_flag_index(),
         }
         return web.json_response(data)
 
@@ -56,22 +58,24 @@ async def srs(port=None):
     if port == None:
         port = find_free_port()
     site = web.TCPSite(runner, "0.0.0.0", port)
-    print(f"{site.name} starting")
+    logging.info(f"{site.name} starting")
     try:
         await site.start()
     except OSError:
-        print(f"port {port} already in use, trying a different one")
+        logging.warn(f"port {port} already in use, trying a different one")
         await srs()
 
     # wait for closing event
     await closing_task
-    print(f"{site.name} closing")
+    logging.info(f"{site.name} closing")
     await runner.cleanup()
 
     await srs(handler.next_port)
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+
     loop = asyncio.get_event_loop()
 
     loop.create_task(homepage())
@@ -82,9 +86,9 @@ if __name__ == "__main__":
     try:
         loop.run_forever()
     except:
-        print("\nexiting...")
+        logging.info("\nexiting...")
     finally:
         for c in closers:
-            c.set()  # useful event to also call await runner.cleanup()
+            c.set()  # trigger close event which runs runner.cleanup()
         for r in runners:
             loop.create_task(r.cleanup())
