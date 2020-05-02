@@ -44,7 +44,7 @@ class ClosingHandler:
 
 
 # single request server
-async def srs(port=None):
+async def srs(loop, port=None):
 
     # create app handler and closing event
     closing_time = asyncio.Event()
@@ -69,14 +69,14 @@ async def srs(port=None):
         logging.warn(
             f"port {port} already in use, trying a different one"
         )
-        await srs()
+        await srs(loop)
 
     # wait for closing event
     await closing_task
     logging.info(f"{site.name} closing")
     await runner.cleanup()
 
-    await srs(handler.next_port)
+    loop.create_task(srs(loop, handler.next_port))
 
 
 if __name__ == "__main__":
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     loop.create_task(homepage())
 
     for i in range(100):
-        loop.create_task(srs())
+        loop.create_task(srs(loop))
 
     try:
         loop.run_forever()
